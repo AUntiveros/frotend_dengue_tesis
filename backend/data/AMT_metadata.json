@@ -1,0 +1,112 @@
+{
+  "all_features": [
+    "casos_lag1",
+    "casos_lag2",
+    "casos_lag4",
+    "casos_lag8",
+    "casos_lag12",
+    "casos_lag16",
+    "casos_lag26",
+    "casos_lag52",
+    "casos_ma4",
+    "casos_ma12",
+    "casos_diff4",
+    "casos_diff12",
+    "humr_clima_lag_depto",
+    "ptot_clima_lag_depto",
+    "tmean_clima_lag_depto",
+    "tmin_clima_lag_depto",
+    "ndvi_lag4",
+    "ndwi_lag4",
+    "precip_chirps_mm_lag4",
+    "estado_vegetacion_lag4",
+    "hum_adj_veg_lag4",
+    "tmean_x_ndvi",
+    "ptot_x_ndwi",
+    "humr_x_veg",
+    "chirps_x_ndwi",
+    "endemico",
+    "cluster_code",
+    "flag_anomalia",
+    "cluster_HH",
+    "cluster_LL",
+    "cluster_LH",
+    "alt_costa_selva",
+    "alt_sierra_baja",
+    "alt_sierra_alta",
+    "altitud",
+    "pendiente",
+    "SE_sin",
+    "SE_cos",
+    "tasa_lag4",
+    "tasa_lag8",
+    "tasa_lag12"
+  ],
+  "feat_autoregresivas": [
+    "casos_lag1",
+    "casos_lag2",
+    "casos_lag4",
+    "casos_lag8",
+    "casos_lag12",
+    "casos_lag16",
+    "casos_lag26",
+    "casos_lag52",
+    "casos_ma4",
+    "casos_ma12",
+    "casos_diff4",
+    "casos_diff12"
+  ],
+  "feat_climaticas": [
+    "humr_clima_lag_depto",
+    "ptot_clima_lag_depto",
+    "tmean_clima_lag_depto",
+    "tmin_clima_lag_depto"
+  ],
+  "feat_satelitales": [
+    "ndvi_lag4",
+    "ndwi_lag4",
+    "precip_chirps_mm_lag4",
+    "estado_vegetacion_lag4",
+    "hum_adj_veg_lag4"
+  ],
+  "feat_interacciones": [
+    "tmean_x_ndvi",
+    "ptot_x_ndwi",
+    "humr_x_veg",
+    "chirps_x_ndwi"
+  ],
+  "feat_espaciales": [
+    "endemico",
+    "cluster_code",
+    "flag_anomalia",
+    "cluster_HH",
+    "cluster_LL",
+    "cluster_LH",
+    "alt_costa_selva",
+    "alt_sierra_baja",
+    "alt_sierra_alta"
+  ],
+  "feat_topograficas": [
+    "altitud",
+    "pendiente"
+  ],
+  "feat_ciclicas": [
+    "SE_sin",
+    "SE_cos"
+  ],
+  "feat_tasa": [
+    "tasa_lag4",
+    "tasa_lag8",
+    "tasa_lag12"
+  ],
+  "horizontes": [
+    4,
+    8,
+    12
+  ],
+  "corte_train": "2022-12-31",
+  "corte_val": "2023-12-31",
+  "use_log": true,
+  "n_distritos": 1891,
+  "n_filas": 908980
+}

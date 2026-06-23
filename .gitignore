@@ -1,0 +1,22 @@
+# Dependencias y build
+node_modules/
+dist/
+*.local
+
+# Artefactos pesados del backend (NO a git — exceden límites; regenerables)
+backend/data/*
+!backend/data/AMT_metadata.json
+backend/modelos/
+geoespacial_2025/
+backend/**/__pycache__/
+__pycache__/
+*.pyc
+
+# Editor / SO
+.DS_Store
+.vscode/
+*.log
+
+# NOTA: public/data/ SÍ se versiona (lo sirve Vercel estáticamente):
+#   - predicciones_semana.json  (salida del generador, ~12 MB)
+#   - distritos.topojson, departamentos.geojson
