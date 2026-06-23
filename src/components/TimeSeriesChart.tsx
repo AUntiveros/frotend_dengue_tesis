@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import {
   ResponsiveContainer, ComposedChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Brush, ReferenceLine, ReferenceArea,
@@ -40,6 +40,7 @@ export default function TimeSeriesChart({
   // Rango por defecto: desde el inicio del periodo de validación (contexto reciente)
   const defaultStart = Math.max(0, (idxTrain >= 0 ? idxTrain : weeks.length - 156))
   const [range, setRange] = useState<[number, number]>([defaultStart, weeks.length - 1])
+  const timeoutRef = useRef<number | null>(null)
 
   return (
     <div>
@@ -89,7 +90,10 @@ export default function TimeSeriesChart({
               if (r && typeof r.startIndex === 'number' && typeof r.endIndex === 'number') {
                 setRange([r.startIndex, r.endIndex])
                 // El borde derecho del rango = semana reportada que pinta el mapa
-                onWeekChange?.(Math.min(r.endIndex, lastObs))
+                if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+                timeoutRef.current = window.setTimeout(() => {
+                  onWeekChange?.(Math.min(r.endIndex, lastObs))
+                }, 50)
               }
             }}
           />

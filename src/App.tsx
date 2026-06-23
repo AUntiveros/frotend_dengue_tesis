@@ -108,7 +108,25 @@ export default function App() {
             <span className="text-xs text-slate-400">{data.meta.se_label}</span>
           </div>
           <div className="h-6 w-px bg-slate-200" />
-          <span className="text-xs font-semibold text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md">PUCP</span>
+          
+          <div className="relative group flex items-center">
+            <span className="text-xs font-semibold text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md cursor-help flex items-center gap-1 hover:bg-slate-50 transition-colors">
+              PUCP
+              <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </span>
+            {/* Tooltip con créditos */}
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-700 text-xs rounded-xl p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999] pointer-events-none border border-slate-200">
+              <p className="font-bold text-sm mb-1 text-blue-700">Proyecto de Tesis</p>
+              <p className="text-slate-500 mb-2">Ingeniería Biomédica</p>
+              <div className="h-px w-full bg-slate-200 my-2" />
+              <p className="font-medium text-slate-800">Alejandro Alvaro Untiveros Parra</p>
+              <p className="text-slate-500 mt-1">Asesora: Dra. Rene Flores Clavo</p>
+              <p className="text-slate-400 mt-1">2026</p>
+            </div>
+          </div>
+
           <ModelSelector
             models={data.models}
             activeModel={activeModel}
