@@ -73,20 +73,27 @@ REGISTRO_MODELOS = [
 ]
 
 
-def pivot_pred(panel, valores, hist_weeks, ref, forward):
+def pivot_pred(panel, valores, target_weeks, ref, forward):
     """
     Reorganiza predicciones por (ubigeo × semana) y las alinea a las semanas
-    de display. Para modelos de horizonte desplaza la columna +4 semanas para
-    que cada semana muestre la predicción hecha 4 semanas antes.
-    Devuelve (tabla_series[ubigeo×hist_weeks], headline[ubigeo] en ref).
+    objetivo `target_weeks` (periodo de test + cola de pronóstico).
+
+    Para modelos de horizonte (forward), la predicción PARA la semana `t` se hizo
+    con las features de `t-4`; los modelos contemporáneos (ZIP) usan `t`. Esto
+    hace que la cola de pronóstico (SE+1..SE+4 tras la última semana observada)
+    quede como predicho-sin-observado, y que el extremo de la serie coincida con
+    el valor H4 del mapa.
+
+    Devuelve (tabla_series[ubigeo×target_weeks], headline[ubigeo] en ref).
     """
     tmp = panel[["ubigeo", "fecha"]].copy()
     tmp["v"] = np.asarray(valores, dtype=float)
     tab = tmp.pivot(index="ubigeo", columns="fecha", values="v")
-    headline = tab.get(ref)                       # predicción hecha en ref
-    if forward:
-        tab = tab.shift(4, axis=1)                # col w = forecast PARA w
-    series = tab.reindex(columns=hist_weeks)
+    headline = tab.get(ref)                        # pred hecha en ref (forecast a ref+4)
+    delta = pd.Timedelta(weeks=4) if forward else pd.Timedelta(0)
+    fuente = [pd.Timestamp(t) - delta for t in target_weeks]
+    series = tab.reindex(columns=fuente)
+    series.columns = list(target_weeks)            # renombrar a la semana objetivo
     return series, headline
 
 
@@ -106,10 +113,13 @@ def main():
     hist_weeks = comun.semanas_rango(df, ref)
     pred_weeks = [w for w in hist_weeks if pd.Timestamp(w) > corte_val]
     pred_offset = len(hist_weeks) - len(pred_weeks)
+    # Cola de pronóstico: 4 semanas posteriores a la última observada (solo predicho)
+    future_weeks = [pd.Timestamp(ref) + pd.Timedelta(weeks=k) for k in (1, 2, 3, 4)]
+    target_weeks = list(pred_weeks) + future_weeks      # eje de la serie predicha
     print(f"Semana de referencia : {pd.Timestamp(ref).date()} ({comun.etiqueta_se(ref)})")
     print(f"Distritos            : {df['ubigeo'].nunique()}")
     print(f"Historia observada   : {len(hist_weeks)} semanas ({pd.Timestamp(hist_weeks[0]).date()} → {pd.Timestamp(ref).date()})")
-    print(f"Predicción (test)    : {len(pred_weeks)} semanas (offset {pred_offset})")
+    print(f"Predicción           : {len(pred_weeks)} test + {len(future_weeks)} pronóstico (offset {pred_offset})")
 
     # Panel con buffer hacia atrás (cubre shift de 4 y ventana LSTM de 12)
     buffer_ini = pd.Timestamp(pred_weeks[0]) - pd.Timedelta(weeks=18)
@@ -144,7 +154,7 @@ def main():
     # ZIP M7b (contemporáneo)
     print("\nInfiriendo ZIP M7b...")
     series_por_modelo["M7b"], headline_por_modelo["M7b"] = pivot_pred(
-        panel, zip_m.pred_raw(panel), pred_weeks, ref, forward=False)
+        panel, zip_m.pred_raw(panel), target_weeks, ref, forward=False)
     ey_ref, lo_ref, hi_ref = zip_m.pred_intervalo(ref_rows.reset_index())
     zip_ci = pd.DataFrame({"p": ey_ref, "lo": lo_ref, "hi": hi_ref},
                           index=ref_rows.index)
@@ -153,14 +163,14 @@ def main():
     for mid, m in arboles.items():
         print(f"Infiriendo {mid}...")
         series_por_modelo[mid], headline_por_modelo[mid] = pivot_pred(
-            panel, m.pred_raw(panel), pred_weeks, ref, forward=True)
+            panel, m.pred_raw(panel), target_weeks, ref, forward=True)
 
     # BiLSTM (horizonte, secuencial)
     if bilstm is not None:
         print("Infiriendo BiLSTM...")
         pred_lstm = bilstm.pred_panel(panel)
         series_por_modelo["BILSTM"], headline_por_modelo["BILSTM"] = pivot_pred(
-            panel, pred_lstm.values, pred_weeks, ref, forward=True)
+            panel, pred_lstm.values, target_weeks, ref, forward=True)
 
     modelos_mapa = [m for m in series_por_modelo]   # ids con predicción distrital
     print(f"\nModelos distritales activos: {modelos_mapa}")
@@ -200,7 +210,8 @@ def main():
                 "p": comun.r(p),
                 "lo": comun.r(lo),
                 "hi": comun.r(hi),
-                "series": [comun.r(v) for v in (serie.values if serie is not None else [])],
+                "series": [None if not np.isfinite(v) else comun.r(v)
+                           for v in (serie.values if serie is not None else [])],
             }
             # Importancia de variables (solo donde el modelo la expone)
             if ref_row_df is not None:
@@ -231,15 +242,16 @@ def main():
         "pred": {},
     }
     for mid in modelos_mapa:
-        s = series_por_modelo[mid].sum(axis=0).reindex(pred_weeks)
+        s = series_por_modelo[mid].reindex(columns=target_weeks).sum(axis=0, min_count=1)
         p = float(headline_por_modelo[mid].sum())
         nacional["pred"][mid] = {
-            "p": comun.r(p), "series": [comun.r(v) for v in s.values],
+            "p": comun.r(p),
+            "series": [None if not np.isfinite(v) else comun.r(v) for v in s.values],
         }
     if prophet is not None:
         try:
-            fc = prophet.predecir(df, pred_weeks)
-            fc = fc.set_index("ds").reindex([pd.Timestamp(w) for w in pred_weeks])
+            fc = prophet.predecir(df, target_weeks)
+            fc = fc.set_index("ds").reindex([pd.Timestamp(w) for w in target_weeks])
             nacional["pred"]["PROPHET"] = {
                 "p": comun.r(fc["yhat"].iloc[-1]),
                 "series": [comun.r(v) for v in fc["yhat"].values],
@@ -266,6 +278,9 @@ def main():
             "n_hist_semanas": len(hist_weeks),
             "pred_offset": pred_offset,
             "n_pred_semanas": len(pred_weeks),
+            "n_future_semanas": len(future_weeks),
+            "future_weeks": [comun.etiqueta_se(w) for w in future_weeks],
+            "future_fechas": [pd.Timestamp(w).strftime("%Y-%m-%d") for w in future_weeks],
             "hist_desde": pd.Timestamp(hist_weeks[0]).strftime("%Y-%m-%d"),
             "corte_train": corte_train.strftime("%Y-%m-%d"),
             "corte_val": corte_val.strftime("%Y-%m-%d"),

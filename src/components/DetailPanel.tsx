@@ -92,11 +92,12 @@ export default function DetailPanel({ data, selectedUbigeo, activeModel }: Props
           Serie temporal · observado vs predicho
         </p>
         <TimeSeriesChart
-          weeks={view.histWeeks}
-          fechas={data.hist_fechas}
+          weeks={[...view.histWeeks, ...data.meta.future_weeks]}
+          fechas={[...data.hist_fechas, ...data.meta.future_fechas]}
           hist={view.hist}
           predSeries={pred?.series ?? null}
           predOffset={data.meta.pred_offset}
+          forecastStart={data.meta.n_hist_semanas}
           corteTrain={data.meta.corte_train}
           corteVal={data.meta.corte_val}
           modelName={activeModel.name}

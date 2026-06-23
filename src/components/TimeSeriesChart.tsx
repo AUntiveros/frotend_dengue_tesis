@@ -1,22 +1,23 @@
 import { useMemo, useState } from 'react'
 import {
   ResponsiveContainer, ComposedChart, Line, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Brush, ReferenceLine,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Brush, ReferenceLine, ReferenceArea,
 } from 'recharts'
 
 interface Props {
-  weeks: string[]              // hist_weeks completo (desde 2018)
-  fechas: string[]             // hist_fechas ISO (para líneas de corte)
-  hist: number[]               // casos observados, full
-  predSeries: number[] | null  // casos predichos (solo periodo test)
+  weeks: string[]              // eje completo: observado (desde 2018) + cola de pronóstico
+  fechas: string[]             // ISO (para líneas de corte)
+  hist: number[]               // casos observados (más corto que weeks → null al final)
+  predSeries: number[] | null  // casos predichos (test + pronóstico)
   predOffset: number           // índice en weeks donde empieza la predicción
+  forecastStart: number        // índice donde empieza la cola de pronóstico (sin observado)
   corteTrain: string           // ISO
   corteVal: string             // ISO
   modelName: string
 }
 
 export default function TimeSeriesChart({
-  weeks, fechas, hist, predSeries, predOffset, corteTrain, corteVal, modelName,
+  weeks, fechas, hist, predSeries, predOffset, forecastStart, corteTrain, corteVal, modelName,
 }: Props) {
   const data = useMemo(() => weeks.map((w, i) => {
     const j = i - predOffset
@@ -62,6 +63,11 @@ export default function TimeSeriesChart({
           {idxVal >= 0 && (
             <ReferenceLine x={weeks[idxVal]} stroke="#fbbf24" strokeDasharray="3 3"
               label={{ value: 'test →', position: 'insideTopRight', fontSize: 8, fill: '#d97706' }} />
+          )}
+          {forecastStart < weeks.length && (
+            <ReferenceArea x1={weeks[forecastStart]} x2={weeks[weeks.length - 1]}
+              fill="#f97316" fillOpacity={0.08} stroke="none"
+              label={{ value: 'pronóstico', position: 'insideTop', fontSize: 8, fill: '#ea580c' }} />
           )}
 
           <Area type="monotone" dataKey="hi" stroke="transparent" fill="#fed7aa" fillOpacity={0.5} connectNulls legendType="none" name="ic_hi" />

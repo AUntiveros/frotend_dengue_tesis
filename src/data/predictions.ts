@@ -54,6 +54,9 @@ export interface Dashboard {
     n_hist_semanas: number
     pred_offset: number          // índice en hist_weeks donde empieza la predicción
     n_pred_semanas: number
+    n_future_semanas: number     // semanas de pronóstico tras la última observada
+    future_weeks: string[]       // etiquetas SExx de la cola de pronóstico
+    future_fechas: string[]
     hist_desde: string
     corte_train: string
     corte_val: string

@@ -44,3 +44,24 @@ falta toggle reportado/predicho, realce de departamento perdido.
 
 **Tamaño JSON**: 5.8 MB → 12 MB (por la historia completa). Gzip ≈ 2-3 MB en
 producción. Si se requiere reducir: redondear `series`/`hist` a enteros.
+
+## Sesión 3 — Detalles profesionales + deploy
+
+1. **Máscara gris en modo departamento** — los departamentos no seleccionados ya
+   no quedan blancos; se atenúan con gris suave (`#94a3b8` opacity 0.35),
+   manteniendo el contexto mientras resalta el departamento seleccionado.
+
+2. **Cola de pronóstico (SE12–SE15)** — la serie temporal se extiende 4 semanas
+   tras la última observada, como predicho-sin-observado. Resuelve el desajuste
+   "mapa H4 vs serie": ahora el **extremo de la serie = valor H4 del mapa** por
+   modelo. Forward (XGB/LGB/RF/Stacking/BiLSTM) pronostican SE15; ZIP es
+   contemporáneo (nowcast SE11, cola null). Zona de pronóstico sombreada + nuevos
+   campos `future_weeks`/`future_fechas` en el JSON.
+
+3. **Scrubber de semana en el mapa (modo Reportado)** — slider sobre las 426
+   semanas; al moverlo el mapa pinta los casos reportados de esa semana
+   (navegación histórica estilo CDC). El selector de fechas ahora "dibuja" sobre
+   el mapa lo seleccionado.
+
+4. **Deploy** — `.gitignore`, `vercel.json`, repo en GitHub
+   (`AUntiveros/frotend_dengue_tesis`). Vercel sirve frontend + `public/` estático.
