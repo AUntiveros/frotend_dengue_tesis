@@ -14,11 +14,13 @@ interface Props {
   corteTrain: string           // ISO
   corteVal: string             // ISO
   modelName: string
+  onWeekChange?: (idx: number) => void   // reporta la semana (borde derecho) al mapa
 }
 
 export default function TimeSeriesChart({
-  weeks, fechas, hist, predSeries, predOffset, forecastStart, corteTrain, corteVal, modelName,
+  weeks, fechas, hist, predSeries, predOffset, forecastStart, corteTrain, corteVal, modelName, onWeekChange,
 }: Props) {
+  const lastObs = forecastStart - 1
   const data = useMemo(() => weeks.map((w, i) => {
     const j = i - predOffset
     const pred = predSeries && j >= 0 ? predSeries[j] : null
@@ -86,6 +88,8 @@ export default function TimeSeriesChart({
             onChange={(r: any) => {
               if (r && typeof r.startIndex === 'number' && typeof r.endIndex === 'number') {
                 setRange([r.startIndex, r.endIndex])
+                // El borde derecho del rango = semana reportada que pinta el mapa
+                onWeekChange?.(Math.min(r.endIndex, lastObs))
               }
             }}
           />
@@ -93,7 +97,7 @@ export default function TimeSeriesChart({
       </ResponsiveContainer>
 
       <p className="text-[10px] text-slate-400 mt-1">
-        Observado desde {weeks[0]} (azul) · Predicho out-of-sample post-validación (naranja, {modelName}) · Arrastra el control inferior para acotar fechas.
+        Observado desde {weeks[0]} (azul) · Predicho post-validación (naranja, {modelName}) · El control inferior acota fechas y fija la semana del mapa en modo Reportado.
       </p>
     </div>
   )

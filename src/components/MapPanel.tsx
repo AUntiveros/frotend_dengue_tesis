@@ -13,6 +13,7 @@ interface Props {
   data: Dashboard
   activeModelId: string         // modelo distrital usado para pintar el mapa
   modelHasMap: boolean          // false → el modelo activo no es distrital
+  obsWeek: number               // semana reportada (control del selector de la serie)
   onDistrictClick: (ubigeo: string | null) => void
   selectedUbigeo: string | null
 }
@@ -20,7 +21,7 @@ interface Props {
 const PERU_CENTER: [number, number] = [-9.2, -74.5]
 const PERU_ZOOM = 5
 
-export default function MapPanel({ data, activeModelId, modelHasMap, onDistrictClick, selectedUbigeo }: Props) {
+export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, onDistrictClick, selectedUbigeo }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const districtsLayerRef = useRef<L.GeoJSON | null>(null)
@@ -28,12 +29,9 @@ export default function MapPanel({ data, activeModelId, modelHasMap, onDistrictC
   const deptLabelsLayerRef = useRef<L.LayerGroup | null>(null)
   const selectedDeptLayerRef = useRef<L.GeoJSON | null>(null)
 
-  const lastWeek = data.meta.n_hist_semanas - 1
-
   const [mapMode, setMapMode] = useState<MapMode>('full')
   const [mapMetric, setMapMetric] = useState<MapMetric>('cases')
   const [mapSource, setMapSource] = useState<MapSource>('pred')
-  const [obsWeek, setObsWeek] = useState<number>(lastWeek)   // semana reportada en el mapa
   const [selectedDeptCcdd, setSelectedDeptCcdd] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -329,28 +327,6 @@ export default function MapPanel({ data, activeModelId, modelHasMap, onDistrictC
           Predicho (H4)
         </button>
       </div>
-
-      {/* Scrubber de semana (solo modo Reportado) — navegación histórica estilo CDC */}
-      {mapSource === 'obs' && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-[1000] bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-md w-[420px] max-w-[90%]">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-semibold text-slate-500">Semana reportada</span>
-            <span className="text-[11px] font-bold text-slate-800 tabular-nums">{data.hist_weeks[obsWeek]}</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={lastWeek}
-            value={obsWeek}
-            onChange={(e) => setObsWeek(Number(e.target.value))}
-            className="w-full accent-orange-600 cursor-pointer"
-          />
-          <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
-            <span>{data.hist_weeks[0]}</span>
-            <button onClick={() => setObsWeek(lastWeek)} className="text-blue-600 hover:underline font-medium">última →</button>
-          </div>
-        </div>
-      )}
 
       {/* Colorbar & Metric Switch */}
       <div className="absolute bottom-5 left-3 z-[1000] bg-white border border-slate-200 rounded-xl p-3 shadow-md w-56">

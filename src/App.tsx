@@ -16,9 +16,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [activeModelId, setActiveModelId] = useState<string>('M7b')
   const [selectedUbigeo, setSelectedUbigeo] = useState<string | null>(null)
+  // Semana reportada en el mapa — controlada por el selector de rango de la serie
+  const [obsWeek, setObsWeek] = useState<number>(0)
 
   useEffect(() => {
-    loadDashboard().then(setData).catch(e => setError(String(e)))
+    loadDashboard().then(d => {
+      setData(d)
+      setObsWeek(d.meta.n_hist_semanas - 1)   // por defecto: última semana observada
+    }).catch(e => setError(String(e)))
   }, [])
 
   const activeModel: ModelInfo | undefined = useMemo(
@@ -120,6 +125,7 @@ export default function App() {
             data={data}
             activeModelId={activeModel.map ? activeModelId : 'M7b'}
             modelHasMap={activeModel.map}
+            obsWeek={obsWeek}
             onDistrictClick={setSelectedUbigeo}
             selectedUbigeo={selectedUbigeo}
           />
@@ -134,6 +140,7 @@ export default function App() {
             data={data}
             selectedUbigeo={selectedUbigeo}
             activeModel={activeModel}
+            onWeekChange={setObsWeek}
           />
         </div>
       </main>

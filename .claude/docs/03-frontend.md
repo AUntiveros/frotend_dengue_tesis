@@ -34,8 +34,10 @@ App: loadDashboard() ──► data: Dashboard
 
 ### MapPanel
 - Pinta cada distrito con `riskColor(valor)` donde el valor depende de:
-  - **Fuente**: toggle `Reportado` (= `district.hist[last]`, casos en semana ref)
-    vs `Predicho (H4)` (= `district.pred[modelId].p`).
+  - **Fuente**: toggle `Reportado` (= `district.hist[obsWeek]`, casos en la semana
+    elegida con el selector de rango de la serie) vs `Predicho (H4)`
+    (= `district.pred[modelId].p`). `obsWeek` vive en `App`; el `<Brush>` de
+    `TimeSeriesChart` lo fija (borde derecho del rango). No hay slider en el mapa.
   - **Métrica**: `Casos / SE` vs `Tasa ×100k` (divide por población).
 - Si el modelo activo no es distrital (`map=false`), pinta M7b y muestra un
   banner ("modelo sin desagregación distrital").

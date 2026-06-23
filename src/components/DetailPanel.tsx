@@ -8,6 +8,7 @@ interface Props {
   data: Dashboard
   selectedUbigeo: string | null
   activeModel: ModelInfo
+  onWeekChange?: (idx: number) => void
 }
 
 const LISA_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -20,7 +21,7 @@ const LISA_CONFIG: Record<string, { label: string; bg: string; text: string; bor
 
 const DISABLED_HORIZONS = ['H1', 'H8', 'H12', 'H24']
 
-export default function DetailPanel({ data, selectedUbigeo, activeModel }: Props) {
+export default function DetailPanel({ data, selectedUbigeo, activeModel, onWeekChange }: Props) {
   const view = useMemo(() => buildView(data, selectedUbigeo, activeModel.id), [data, selectedUbigeo, activeModel.id])
 
   const lisa = LISA_CONFIG[view.lisa] ?? LISA_CONFIG.ns
@@ -101,6 +102,7 @@ export default function DetailPanel({ data, selectedUbigeo, activeModel }: Props
           corteTrain={data.meta.corte_train}
           corteVal={data.meta.corte_val}
           modelName={activeModel.name}
+          onWeekChange={onWeekChange}
         />
       </div>
 

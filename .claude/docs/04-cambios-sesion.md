@@ -65,3 +65,12 @@ producción. Si se requiere reducir: redondear `series`/`hist` a enteros.
 
 4. **Deploy** — `.gitignore`, `vercel.json`, repo en GitHub
    (`AUntiveros/frotend_dengue_tesis`). Vercel sirve frontend + `public/` estático.
+
+## Sesión 4 — Unificación del control temporal
+
+- Se **eliminó el slider redundante sobre el mapa**. La semana reportada que pinta
+  el mapa (modo Reportado) ahora la controla el **selector de rango bajo la serie
+  temporal** (`<Brush>`): su borde derecho fija la semana del mapa. Estado `obsWeek`
+  elevado a `App` y compartido entre `MapPanel` (lectura) y `TimeSeriesChart`
+  (escritura vía `onWeekChange`).
+- **Deploy queda en H4** (único horizonte entrenado). Pendientes en `05-*.md`.
