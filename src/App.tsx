@@ -14,15 +14,18 @@ const HORIZON_LABELS: Record<string, string> = {
 export default function App() {
   const [data, setData] = useState<Dashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeModelId, setActiveModelId] = useState<string>('M7b')
+  const [activeModelId, setActiveModelId] = useState<string>('ENS_H4')
   const [selectedUbigeo, setSelectedUbigeo] = useState<string | null>(null)
   // Semana reportada en el mapa — controlada por el selector de rango de la serie
   const [obsWeek, setObsWeek] = useState<number>(0)
+  const [obsRange, setObsRange] = useState<[number, number]>([0, 0])
 
   useEffect(() => {
     loadDashboard().then(d => {
       setData(d)
+      setActiveModelId(d.meta.modelo_default || 'ENS_H4')
       setObsWeek(d.meta.n_hist_semanas - 1)   // por defecto: última semana observada
+      setObsRange([d.meta.n_hist_semanas - 1, d.meta.n_hist_semanas - 1])
     }).catch(e => setError(String(e)))
   }, [])
 
@@ -141,9 +144,10 @@ export default function App() {
         <div className="relative flex-[60]">
           <MapPanel
             data={data}
-            activeModelId={activeModel.map ? activeModelId : 'M7b'}
+            activeModelId={activeModel.map ? activeModelId : data.meta.modelo_default}
             modelHasMap={activeModel.map}
             obsWeek={obsWeek}
+            obsRange={obsRange}
             onDistrictClick={setSelectedUbigeo}
             selectedUbigeo={selectedUbigeo}
           />
@@ -159,6 +163,7 @@ export default function App() {
             selectedUbigeo={selectedUbigeo}
             activeModel={activeModel}
             onWeekChange={setObsWeek}
+            onRangeChange={setObsRange}
           />
         </div>
       </main>

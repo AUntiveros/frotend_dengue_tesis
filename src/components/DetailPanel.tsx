@@ -9,6 +9,7 @@ interface Props {
   selectedUbigeo: string | null
   activeModel: ModelInfo
   onWeekChange?: (idx: number) => void
+  onRangeChange?: (range: [number, number]) => void
 }
 
 const LISA_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -21,12 +22,13 @@ const LISA_CONFIG: Record<string, { label: string; bg: string; text: string; bor
 
 const DISABLED_HORIZONS = ['H1', 'H8', 'H12', 'H24']
 
-export default function DetailPanel({ data, selectedUbigeo, activeModel, onWeekChange }: Props) {
+export default function DetailPanel({ data, selectedUbigeo, activeModel, onWeekChange, onRangeChange }: Props) {
   const view = useMemo(() => buildView(data, selectedUbigeo, activeModel.id), [data, selectedUbigeo, activeModel.id])
 
   const lisa = LISA_CONFIG[view.lisa] ?? LISA_CONFIG.ns
   const pred = view.pred
-  const colorRef = pred ? riskColor(view.isNational ? pred.p / 100 : pred.p) : '#94a3b8'
+  const hasHeadline = pred?.p != null
+  const colorRef = hasHeadline ? riskColor(view.isNational ? pred.p! / 100 : pred.p!) : '#94a3b8'
 
   return (
     <div className="flex flex-col h-full overflow-y-auto detail-slide-in">
@@ -50,21 +52,25 @@ export default function DetailPanel({ data, selectedUbigeo, activeModel, onWeekC
           <div className="flex-1 rounded-xl border border-blue-500 bg-blue-50 ring-1 ring-blue-500 px-3 py-2 flex flex-col justify-center">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-blue-700">H4 · 4 semanas</span>
-              {pred && (
+              {hasHeadline && (
                 <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: colorRef + '22', color: colorRef }}>
-                  {riskLabel(view.isNational ? pred.p / 100 : pred.p)}
+                  {riskLabel(view.isNational ? pred!.p! / 100 : pred!.p!)}
                 </span>
               )}
             </div>
-            {pred ? (
+            {hasHeadline ? (
               <>
                 <span className="text-2xl font-bold mt-0.5" style={{ color: colorRef }}>
-                  {Math.round(pred.p).toLocaleString()}
+                  {Math.round(pred!.p!).toLocaleString()}
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  IC95%: {Math.round(pred.lo)}–{Math.round(pred.hi)} casos
+                  IC95%: {Math.round(pred!.lo ?? 0)}–{Math.round(pred!.hi ?? 0)} casos
                 </span>
               </>
+            ) : pred ? (
+              <span className="text-sm text-slate-400 mt-1">
+                Serie histórica cargada; sin pronóstico vigente para {data.meta.future_weeks[data.meta.future_weeks.length - 1]}
+              </span>
             ) : (
               <span className="text-sm text-slate-400 mt-1">Sin predicción distrital para {activeModel.id}</span>
             )}
@@ -103,6 +109,7 @@ export default function DetailPanel({ data, selectedUbigeo, activeModel, onWeekC
           corteVal={data.meta.corte_val}
           modelName={activeModel.name}
           onWeekChange={onWeekChange}
+          onRangeChange={onRangeChange}
         />
       </div>
 
@@ -186,7 +193,12 @@ function buildView(data: Dashboard, ubigeo: string | null, modelId: string): Vie
     histWeeks: data.hist_weeks,
     hist: data.nacional.hist,
     pred: nac
-      ? { p: nac.p, lo: nac.lo?.[nac.lo.length - 1] ?? nac.p * 0.8, hi: nac.hi?.[nac.hi.length - 1] ?? nac.p * 1.2, series: nac.series }
+      ? {
+        p: nac.p,
+        lo: nac.p != null ? (nac.lo?.[nac.lo.length - 1] ?? nac.p * 0.8) : null,
+        hi: nac.p != null ? (nac.hi?.[nac.hi.length - 1] ?? nac.p * 1.2) : null,
+        series: nac.series,
+      }
       : null,
   }
 }

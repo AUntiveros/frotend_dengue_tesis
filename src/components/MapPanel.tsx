@@ -7,13 +7,14 @@ import { riskColor } from '../data/predictions'
 
 type MapMode = 'full' | 'department'
 type MapMetric = 'cases' | 'rate'
-type MapSource = 'pred' | 'obs'    // predicción H4 vs casos reportados (semana ref)
+type MapSource = 'pred' | 'obs'
 
 interface Props {
   data: Dashboard
-  activeModelId: string         // modelo distrital usado para pintar el mapa
-  modelHasMap: boolean          // false → el modelo activo no es distrital
-  obsWeek: number               // semana reportada (control del selector de la serie)
+  activeModelId: string
+  modelHasMap: boolean
+  obsWeek: number
+  obsRange: [number, number]
   onDistrictClick: (ubigeo: string | null) => void
   selectedUbigeo: string | null
 }
@@ -21,7 +22,7 @@ interface Props {
 const PERU_CENTER: [number, number] = [-9.2, -74.5]
 const PERU_ZOOM = 5
 
-export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, onDistrictClick, selectedUbigeo }: Props) {
+export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, obsRange, onDistrictClick, selectedUbigeo }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const districtsLayerRef = useRef<L.GeoJSON | null>(null)
@@ -42,6 +43,7 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
   const mapMetricRef = useRef(mapMetric)
   const mapSourceRef = useRef(mapSource)
   const obsWeekRef = useRef(obsWeek)
+  const obsRangeRef = useRef(obsRange)
   const selectedDeptCcddRef = useRef(selectedDeptCcdd)
 
   useEffect(() => { dataRef.current = data }, [data])
@@ -51,26 +53,45 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
   useEffect(() => { mapMetricRef.current = mapMetric }, [mapMetric])
   useEffect(() => { mapSourceRef.current = mapSource }, [mapSource])
   useEffect(() => { obsWeekRef.current = obsWeek }, [obsWeek])
+  useEffect(() => { obsRangeRef.current = obsRange }, [obsRange])
   useEffect(() => { selectedDeptCcddRef.current = selectedDeptCcdd }, [selectedDeptCcdd])
 
-  // valor base de un distrito: predicción H4 o casos reportados en la semana `wk`
-  function districtCases(ubigeo: string, modelId: string, source: MapSource, wk: number): number | null {
+  function districtCases(ubigeo: string, modelId: string, source: MapSource, wk: number, range: [number, number]): number | null {
     const rec = dataRef.current.districts[ubigeo]
     if (!rec) return null
-    if (source === 'obs') return rec.hist.length ? (rec.hist[wk] ?? null) : null
-    const pred = rec.pred[modelId]
-    return pred ? pred.p : null
+    if (source === 'obs') {
+      if (!rec.hist.length) return null
+      const start = Math.max(0, Math.min(range[0], rec.hist.length - 1))
+      const end = Math.max(start, Math.min(range[1], rec.hist.length - 1))
+      return rec.hist.slice(start, end + 1).reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0)
+    }
+    return rec.pred[modelId]?.p ?? null
   }
 
-  // value (casos o tasa) de un distrito bajo el modelo/fuente activos
-  function districtValue(ubigeo: string, modelId: string, metric: MapMetric, source: MapSource, wk: number): number | null {
+  function districtValue(ubigeo: string, modelId: string, metric: MapMetric, source: MapSource, wk: number, range: [number, number]): number | null {
     const rec = dataRef.current.districts[ubigeo]
-    const c = districtCases(ubigeo, modelId, source, wk)
-    if (!rec || c == null) return null
-    return metric === 'cases' ? c : (c / Math.max(rec.pop, 1)) * 100000
+    const cases = districtCases(ubigeo, modelId, source, wk, range)
+    if (!rec || cases == null) return null
+    return metric === 'cases' ? cases : (cases / Math.max(rec.pop, 1)) * 100000
   }
 
-  // Init map once
+  function colorForValue(value: number | null, metric: MapMetric): string {
+    return riskColor(value == null ? -1 : value, metric)
+  }
+
+  function displayValue(value: number | null, metric: MapMetric): string {
+    if (value == null) return '—'
+    return metric === 'cases' ? Math.round(value).toString() : value.toFixed(1)
+  }
+
+  function sourceLabel(src = mapSourceRef.current, range = obsRangeRef.current, wk = obsWeekRef.current): string {
+    const current = dataRef.current
+    if (src === 'pred') return `Predicción H4 · ${current.meta.se_label}`
+    const start = current.hist_weeks[range[0]] ?? current.hist_weeks[wk] ?? 'inicio'
+    const end = current.hist_weeks[range[1]] ?? current.hist_weeks[wk] ?? 'fin'
+    return range[0] === range[1] ? `Reportado · ${end}` : `Reportado acumulado · ${start}–${end}`
+  }
+
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
 
@@ -83,16 +104,10 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
     })
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
-    const container = map.getContainer()
-    container.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false })
+    map.getContainer().addEventListener('wheel', e => e.stopPropagation(), { passive: false })
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18,
-    }).addTo(map)
-
-    L.control.attribution({ prefix: false })
-      .addAttribution('INEI CPV 2025 · CartoDB')
-      .addTo(map)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map)
+    L.control.attribution({ prefix: false }).addAttribution('INEI CPV 2025 · CartoDB').addTo(map)
 
     mapRef.current = map
 
@@ -105,21 +120,15 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
       const map = mapRef.current!
 
       const deptBorders = L.geoJSON(deptos, {
-        style: {
-          fillColor: 'transparent', fillOpacity: 0,
-          color: '#64748b', weight: 1.8, opacity: 0.9,
-        },
+        style: { fillColor: 'transparent', fillOpacity: 0, color: '#64748b', weight: 1.8, opacity: 0.9 },
         onEachFeature: (feature, layer) => {
-          layer.bindTooltip(feature.properties.DEPARTAMEN, {
-            permanent: false, direction: 'center', className: 'map-tooltip',
-          })
+          layer.bindTooltip(feature.properties.DEPARTAMEN, { permanent: false, direction: 'center', className: 'map-tooltip' })
         },
       }).addTo(map)
       deptBordersLayerRef.current = deptBorders
 
-      // Etiquetas con el nombre de cada departamento (centroide), solo vista completa
       const labels = L.layerGroup()
-      deptBorders.eachLayer((l) => {
+      deptBorders.eachLayer(l => {
         const f = (l as L.GeoJSON).feature as GeoJSON.Feature
         const name = (f?.properties as Record<string, string>)?.DEPARTAMEN
         const b = (l as unknown as { getBounds?: () => L.LatLngBounds }).getBounds?.()
@@ -134,7 +143,7 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
       deptLabelsLayerRef.current = labels
 
       const districtsLayer = L.geoJSON(distritos, {
-        style: (feature) => getDistrictStyle(feature, dataRef.current, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current, selectedUbigeoRef.current, mapModeRef.current, selectedDeptCcddRef.current),
+        style: feature => getDistrictStyle(feature, dataRef.current, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current, obsRangeRef.current, selectedUbigeoRef.current, mapModeRef.current, selectedDeptCcddRef.current),
         onEachFeature: (feature, layer) => {
           const props = feature.properties as Record<string, string>
           const ubigeo = props.UBIGEO || ''
@@ -144,17 +153,16 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
           const ccdd = props.CCDD || ''
 
           layer.on('mouseover', function (e: L.LeafletMouseEvent) {
-            const m = mapMetricRef.current
+            const metric = mapMetricRef.current
             const src = mapSourceRef.current
             const rec = dataRef.current.districts[ubigeo]
             const pred = rec?.pred[modelRef.current]
-            const val = districtValue(ubigeo, modelRef.current, m, src, obsWeekRef.current)
-            const unit = m === 'cases' ? 'casos' : 'x100k'
-            const tag = src === 'obs' ? (dataRef.current.hist_weeks[obsWeekRef.current] ?? 'reportado') : 'H4'
-            const displayVal = val == null ? '—' : (m === 'cases' ? Math.round(val).toString() : val.toFixed(1))
-            const color = riskColor(val == null ? -1 : (m === 'cases' ? val : val / 10))
+            const val = districtValue(ubigeo, modelRef.current, metric, src, obsWeekRef.current, obsRangeRef.current)
+            const unit = metric === 'cases' ? 'casos' : 'x100k'
+            const tag = src === 'obs' ? sourceLabel() : 'H4'
+            const color = colorForValue(val, metric)
             const detalle = src === 'pred' && pred
-              ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">IC95%: [${pred.lo}–${pred.hi}] &middot; Pob: ${(rec?.pop ?? 0).toLocaleString()}</div>`
+              ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">IC95%: [${pred.lo ?? '—'}–${pred.hi ?? '—'}] &middot; Pob: ${(rec?.pop ?? 0).toLocaleString()}</div>`
               : `<div style="font-size:10px;color:#94a3b8;margin-top:2px">Pob: ${(rec?.pop ?? 0).toLocaleString()}</div>`
 
             const content = `
@@ -162,12 +170,12 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
                 <div style="font-weight:700;font-size:13px;color:#1e293b;margin-bottom:2px">${distritoName}</div>
                 <div style="font-size:11px;color:#64748b;margin-bottom:6px">${depName} &middot; ${provName}</div>
                 ${val != null
-                  ? `<div style="font-size:15px;font-weight:800;color:${color}">${displayVal} <span style="font-size:11px;font-weight:400;color:#94a3b8">${unit} (${tag})</span></div>${detalle}`
+                  ? `<div style="font-size:15px;font-weight:800;color:${color}">${displayValue(val, metric)} <span style="font-size:11px;font-weight:400;color:#94a3b8">${unit} (${tag})</span></div>${detalle}`
                   : `<div style="font-size:11px;color:#94a3b8">Sin predicción para este modelo &middot; ${ubigeo}</div>`
                 }
               </div>`
 
-            layer.bindPopup(content, { maxWidth: 240, autoPan: false, closeButton: false }).openPopup(e.latlng)
+            layer.bindPopup(content, { maxWidth: 260, autoPan: false, closeButton: false }).openPopup(e.latlng)
 
             if (selectedUbigeoRef.current !== ubigeo) {
               ;(layer as L.Path).setStyle({ weight: 1.5, color: '#475569', fillOpacity: 0.9 })
@@ -193,10 +201,11 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
               if (prevLayer) districtsLayer.resetStyle(prevLayer as L.Path)
             }
 
-            const val = districtValue(ubigeo, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current)
+            const val = districtValue(ubigeo, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current, obsRangeRef.current)
             ;(layer as L.Path).setStyle({
-              color: '#312e81', weight: 3,
-              fillColor: riskColor(val == null ? -1 : (mapMetricRef.current === 'cases' ? val : val / 10)),
+              color: '#312e81',
+              weight: 3,
+              fillColor: colorForValue(val, mapMetricRef.current),
               fillOpacity: 0.95,
             })
             ;(layer as L.Path).bringToFront()
@@ -223,26 +232,26 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
     }
   }, []) // eslint-disable-line
 
-  // Re-pintar cuando cambian modelo / métrica / fuente / semana / selección
   useEffect(() => {
     const layer = districtsLayerRef.current
     if (!layer) return
-    layer.setStyle((feature) =>
-      getDistrictStyle(feature, data, activeModelId, mapMetric, mapSource, obsWeek, selectedUbigeo, mapMode, selectedDeptCcdd)
+    layer.setStyle(feature =>
+      getDistrictStyle(feature, data, activeModelId, mapMetric, mapSource, obsWeek, obsRange, selectedUbigeo, mapMode, selectedDeptCcdd)
     )
     if (selectedUbigeo) {
       const sel = findLayerByUbigeo(layer, selectedUbigeo)
       if (sel) {
-        const val = districtValue(selectedUbigeo, activeModelId, mapMetric, mapSource, obsWeek)
+        const val = districtValue(selectedUbigeo, activeModelId, mapMetric, mapSource, obsWeek, obsRange)
         ;(sel as L.Path).setStyle({
-          color: '#312e81', weight: 3,
-          fillColor: riskColor(val == null ? -1 : (mapMetric === 'cases' ? val : val / 10)),
+          color: '#312e81',
+          weight: 3,
+          fillColor: colorForValue(val, mapMetric),
           fillOpacity: 0.95,
         })
         ;(sel as L.Path).bringToFront()
       }
     }
-  }, [data, activeModelId, mapMetric, mapSource, obsWeek, selectedUbigeo, mapMode, selectedDeptCcdd])
+  }, [data, activeModelId, mapMetric, mapSource, obsWeek, obsRange, selectedUbigeo, mapMode, selectedDeptCcdd])
 
   function handleBackToFull() {
     setMapMode('full')
@@ -255,11 +264,9 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
     if (!map || !depts || !dists) return
 
     map.flyTo(PERU_CENTER, PERU_ZOOM, { animate: true, duration: 0.5 })
-    // Reset COMPLETO del borde departamental (color incluido) → todo Perú marcado uniforme
     depts.setStyle({ fillColor: 'transparent', fillOpacity: 0, color: '#64748b', weight: 1.8, opacity: 0.9 })
-    dists.setStyle((f) => getDistrictStyle(f, dataRef.current, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current, null, 'full', null))
+    dists.setStyle(f => getDistrictStyle(f, dataRef.current, modelRef.current, mapMetricRef.current, mapSourceRef.current, obsWeekRef.current, obsRangeRef.current, null, 'full', null))
 
-    // Restaurar etiquetas de departamentos
     if (deptLabelsLayerRef.current && !map.hasLayer(deptLabelsLayerRef.current)) {
       deptLabelsLayerRef.current.addTo(map)
     }
@@ -283,7 +290,7 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg shadow-md">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           <span className="text-[11px] font-medium text-amber-700">
-            Modelo sin desagregación distrital — mapa mostrando M7b (ZIP)
+            Modelo solo métrica — mapa mostrando el modelo operativo predeterminado
           </span>
         </div>
       )}
@@ -310,12 +317,11 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
         </button>
       )}
 
-      {/* Source toggle: Reportado vs Predicho */}
       <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-lg shadow-md">
         <button
           onClick={() => setMapSource('obs')}
           className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${mapSource === 'obs' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-700'}`}
-          title="Casos reportados en la semana de referencia"
+          title="Casos reportados acumulados en el rango seleccionado"
         >
           Reportado
         </button>
@@ -328,17 +334,16 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
         </button>
       </div>
 
-      {/* Colorbar & Metric Switch */}
       <div className="absolute bottom-5 left-3 z-[1000] bg-white border border-slate-200 rounded-xl p-3 shadow-md w-56">
         <div className="text-[10px] font-semibold text-slate-500 mb-1.5">
-          {mapSource === 'obs' ? `Reportado · ${data.hist_weeks[obsWeek]}` : `Predicción H4 · ${data.meta.se_label}`}
+          {sourceLabel()}
         </div>
         <div className="flex items-center justify-between mb-2.5">
           <button
             onClick={() => setMapMetric('cases')}
             className={`text-[10px] font-semibold transition-colors ${mapMetric === 'cases' ? 'text-blue-700' : 'text-slate-400 hover:text-slate-500'}`}
           >
-            Casos / SE
+            Casos
           </button>
           <button
             onClick={() => setMapMetric(m => m === 'cases' ? 'rate' : 'cases')}
@@ -373,8 +378,6 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, on
   )
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function getDistrictStyle(
   feature: GeoJSON.Feature | undefined,
   data: Dashboard,
@@ -382,6 +385,7 @@ function getDistrictStyle(
   metric: MapMetric,
   source: MapSource,
   obsWeek: number,
+  obsRange: [number, number],
   selectedUbigeo: string | null,
   mode: MapMode,
   selectedDeptCcdd: string | null,
@@ -394,12 +398,17 @@ function getDistrictStyle(
 
   let cases: number | null = null
   if (rec) {
-    cases = source === 'obs'
-      ? (rec.hist.length ? (rec.hist[obsWeek] ?? null) : null)
-      : (rec.pred[modelId]?.p ?? null)
+    if (source === 'obs') {
+      const start = Math.max(0, Math.min(obsRange[0], rec.hist.length - 1))
+      const end = Math.max(start, Math.min(obsRange[1], rec.hist.length - 1))
+      cases = rec.hist.slice(start, end + 1).reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0)
+    } else {
+      cases = rec.pred[modelId]?.p ?? null
+    }
   }
+
   const val = cases == null ? null : (metric === 'cases' ? cases : (cases / Math.max(rec!.pop, 1)) * 100000)
-  const color = riskColor(val == null ? -1 : (metric === 'cases' ? val : val / 10))
+  const color = riskColor(val == null ? -1 : val, metric)
   const hasData = val != null
 
   if (ubigeo === selectedUbigeo) {
@@ -408,7 +417,6 @@ function getDistrictStyle(
 
   if (mode === 'department') {
     if (ccdd !== selectedDeptCcdd) {
-      // Máscara gris suave (no blanco): se mantiene el contexto, atenuado
       return { fillColor: '#94a3b8', fillOpacity: 0.35, color: '#cbd5e1', weight: 0.3, opacity: 0.5 }
     }
     return { fillColor: color, fillOpacity: hasData ? 0.85 : 0.15, color: '#64748b', weight: 0.6, opacity: 0.6 }
@@ -419,7 +427,7 @@ function getDistrictStyle(
 
 function findLayerByUbigeo(geoLayer: L.GeoJSON, ubigeo: string): L.Layer | null {
   let found: L.Layer | null = null
-  geoLayer.eachLayer((layer) => {
+  geoLayer.eachLayer(layer => {
     const f = (layer as L.GeoJSON).feature as GeoJSON.Feature
     const featUbigeo = f?.properties?.UBIGEO
     if (featUbigeo === ubigeo) found = layer
@@ -429,7 +437,7 @@ function findLayerByUbigeo(geoLayer: L.GeoJSON, ubigeo: string): L.Layer | null 
 
 function zoomToDepartment(dists: L.GeoJSON, depts: L.GeoJSON, ccdd: string, map: L.Map) {
   const bounds = L.latLngBounds([])
-  dists.eachLayer((layer) => {
+  dists.eachLayer(layer => {
     const f = (layer as L.GeoJSON).feature as GeoJSON.Feature
     const featCcdd = f?.properties?.CCDD
     if (featCcdd === ccdd) {
@@ -440,7 +448,7 @@ function zoomToDepartment(dists: L.GeoJSON, depts: L.GeoJSON, ccdd: string, map:
   })
   if (bounds.isValid()) map.flyToBounds(bounds, { padding: [40, 40], animate: true, duration: 0.5 })
 
-  depts.setStyle((f) => {
+  depts.setStyle(f => {
     if (!f) return {}
     const featCcdd = (f.properties as Record<string, string>).CCDD
     return {

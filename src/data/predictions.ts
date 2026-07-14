@@ -10,6 +10,7 @@ export interface ModelInfo {
   name: string
   family: string
   description: string
+  n?: number | null
   rmse: number
   mae: number
   r2: number
@@ -20,9 +21,9 @@ export interface ModelInfo {
 }
 
 export interface PredEntry {
-  p: number             // predicción puntual H4 (forecast a 4 semanas)
-  lo: number
-  hi: number
+  p: number | null      // predicción puntual H4 vigente; null si solo hay serie histórica
+  lo: number | null
+  hi: number | null
   series: number[]      // serie alineada a hist_weeks (predicho)
   shap?: [string, number][]
 }
@@ -39,7 +40,7 @@ export interface DistrictRec {
 }
 
 export interface NacionalPred {
-  p: number
+  p: number | null
   series: number[]
   lo?: number[]
   hi?: number[]
@@ -82,21 +83,35 @@ export async function loadDashboard(): Promise<Dashboard> {
 // Cero ≈ blanco (la mayoría del mapa, sierra sin transmisión queda silenciosa);
 // los focos endémicos (HH) destacan en marrón-rojo intenso.
 // Valor negativo = distrito sin predicción para el modelo activo (gris neutro).
-export function riskColor(cases: number): string {
-  if (cases < 0) return '#e2e8f0'
-  if (cases === 0) return '#f8fafc'
-  if (cases <= 2) return '#fee391'
-  if (cases <= 5) return '#fec44f'
-  if (cases <= 20) return '#fe9929'
-  if (cases <= 50) return '#ec7014'
-  if (cases <= 100) return '#cc4c02'
+export function riskColor(value: number, metric: 'cases' | 'rate' = 'cases'): string {
+  if (value < 0) return '#e2e8f0'
+  const displayValue = metric === 'cases' ? Math.round(value) : Number(value.toFixed(1))
+  if (displayValue <= 0) return '#f8fafc'
+  if (metric === 'rate') {
+    if (displayValue <= 50) return '#fee391'
+    if (displayValue <= 200) return '#fec44f'
+    if (displayValue <= 1000) return '#fe9929'
+    if (displayValue <= 5000) return '#cc4c02'
+    return '#8c2d04'
+  }
+  if (displayValue <= 5) return '#fee391'
+  if (displayValue <= 20) return '#fec44f'
+  if (displayValue <= 100) return '#fe9929'
+  if (displayValue <= 500) return '#cc4c02'
   return '#8c2d04'
 }
 
-export function riskLabel(cases: number): string {
-  if (cases <= 0) return 'Sin riesgo'
-  if (cases <= 5) return 'Bajo'
-  if (cases <= 20) return 'Moderado'
-  if (cases <= 100) return 'Alto'
+export function riskLabel(value: number, metric: 'cases' | 'rate' = 'cases'): string {
+  const displayValue = metric === 'cases' ? Math.round(value) : Number(value.toFixed(1))
+  if (displayValue <= 0) return 'Sin riesgo'
+  if (metric === 'rate') {
+    if (displayValue <= 50) return 'Bajo'
+    if (displayValue <= 200) return 'Moderado'
+    if (displayValue <= 1000) return 'Alto'
+    return 'Muy alto'
+  }
+  if (displayValue <= 5) return 'Bajo'
+  if (displayValue <= 20) return 'Moderado'
+  if (displayValue <= 100) return 'Alto'
   return 'Muy alto'
 }

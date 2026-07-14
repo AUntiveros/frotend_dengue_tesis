@@ -15,10 +15,11 @@ interface Props {
   corteVal: string             // ISO
   modelName: string
   onWeekChange?: (idx: number) => void   // reporta la semana (borde derecho) al mapa
+  onRangeChange?: (range: [number, number]) => void
 }
 
 export default function TimeSeriesChart({
-  weeks, fechas, hist, predSeries, predOffset, forecastStart, corteTrain, corteVal, modelName, onWeekChange,
+  weeks, fechas, hist, predSeries, predOffset, forecastStart, corteTrain, corteVal, modelName, onWeekChange, onRangeChange,
 }: Props) {
   const lastObs = forecastStart - 1
   const data = useMemo(() => weeks.map((w, i) => {
@@ -92,7 +93,10 @@ export default function TimeSeriesChart({
                 // El borde derecho del rango = semana reportada que pinta el mapa
                 if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
                 timeoutRef.current = window.setTimeout(() => {
-                  onWeekChange?.(Math.min(r.endIndex, lastObs))
+                  const end = Math.min(r.endIndex, lastObs)
+                  const start = Math.min(r.startIndex, end)
+                  onWeekChange?.(end)
+                  onRangeChange?.([start, end])
                 }, 50)
               }
             }}

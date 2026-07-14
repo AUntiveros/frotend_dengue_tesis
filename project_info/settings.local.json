@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sys\")",
+      "Bash(node -v)",
+      "Bash(npx -v)",
+      "Bash(ogr2ogr --version)",
+      "Bash(python)",
+      "Bash(python -c \"import geopandas; print\\('geopandas OK'\\)\")",
+      "Bash(python -c \"import shapefile; print\\('pyshp OK'\\)\")",
+      "Bash(python -c \"import shapely; print\\('shapely OK'\\)\")",
+      "Bash(pip list *)",
+      "Bash(npm -v)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(python -c \"import pandas,numpy,pyarrow; print\\('pandas',pandas.__version__\\)\")",
+      "Bash(python -c \"import pymc, arviz; print\\('pymc',pymc.__version__\\)\")"
+    ]
+  }
+}
