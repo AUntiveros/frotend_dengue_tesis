@@ -106,8 +106,8 @@ export default function MapPanel({ data, activeModelId, modelHasMap, obsWeek, ob
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     map.getContainer().addEventListener('wheel', e => e.stopPropagation(), { passive: false })
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map)
-    L.control.attribution({ prefix: false }).addAttribution('INEI CPV 2025 · CartoDB').addTo(map)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map)
+    L.control.attribution({ prefix: false }).addAttribution('INEI CPV 2025 · Esri, HERE, Garmin, © OpenStreetMap contributors').addTo(map)
 
     mapRef.current = map
 
